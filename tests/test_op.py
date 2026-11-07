@@ -99,3 +99,71 @@ def test_keychain_names_are_configurable(fake_op, monkeypatch):
     monkeypatch.setenv("ENVREF_OP_KEYCHAIN_SERVICE", "my-service")
     monkeypatch.setenv("ENVREF_OP_KEYCHAIN_ACCOUNT", "me")
     assert (op.keychain_service(), op.keychain_account("test")) == ("my-service", "me")
+
+
+def test_service_account_path_batches_through_the_sdk(monkeypatch):
+    """Drive the SDK branch with a stub client: one resolve_all call, failures named."""
+    import sys
+    import types
+
+    calls: dict[str, object] = {}
+
+    class Content:
+        def __init__(self, secret):
+            self.secret = secret
+
+    class Individual:
+        def __init__(self, secret=None, error=None):
+            self.content = Content(secret) if secret is not None else None
+            self.error = error
+
+    class Response:
+        def __init__(self, individual):
+            self.individual_responses = individual
+
+    class Secrets:
+        async def resolve_all(self, refs):
+            calls["refs"] = list(refs)
+            return Response({
+                "op://v/a/f": Individual("alpha"),
+                "op://v/b/f": Individual(error="no such item"),
+            })
+
+    class Client:
+        @classmethod
+        async def authenticate(cls, *, auth, integration_name, integration_version):
+            calls["auth"] = auth
+            client = cls()
+            client.secrets = Secrets()
+            return client
+
+    stub = types.ModuleType("onepassword.client")
+    stub.Client = Client
+    monkeypatch.setitem(sys.modules, "onepassword", types.ModuleType("onepassword"))
+    monkeypatch.setitem(sys.modules, "onepassword.client", stub)
+    monkeypatch.setenv("OP_SERVICE_ACCOUNT_TOKEN", "ops_token")
+
+    with pytest.raises(ResolveError) as exc:
+        OnePasswordResolver().resolve(["op://v/a/f", "op://v/b/f"])
+    assert exc.value.failures == {"op://v/b/f": "no such item"}
+    assert "read access to that vault" in str(exc.value)
+    assert calls == {"auth": "ops_token", "refs": ["op://v/a/f", "op://v/b/f"]}
+
+    class HappySecrets(Secrets):
+        async def resolve_all(self, refs):
+            return Response({ref: Individual(ref.upper()) for ref in refs})
+
+    Client.authenticate = classmethod(
+        lambda cls, **kw: _coro(_with_secrets(cls(), HappySecrets()))
+    )
+    assert OnePasswordResolver().resolve(["op://v/a/f"]) == {"op://v/a/f": "OP://V/A/F"}
+    assert not (op.session_cache_path()).exists(), "the SDK path never touches the CLI cache"
+
+
+def _with_secrets(client, secrets):
+    client.secrets = secrets
+    return client
+
+
+async def _coro(value):
+    return value
