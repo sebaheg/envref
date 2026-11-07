@@ -1,0 +1,66 @@
+[project]
+name = "envref"
+version = "0.1.0"
+description = "A .env where any value can be a reference into a secret store, resolved at load time. op://, keychain://, file://, env://, and your own."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Sebastian Haglund" }]
+keywords = ["dotenv", "secrets", "1password", "keychain", "environment", "twelve-factor"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: Utilities",
+]
+dependencies = []
+
+[project.optional-dependencies]
+# 1Password service accounts (unattended, no `op` binary). The CLI path needs
+# nothing but the `op` binary on PATH.
+op = ["onepassword-sdk>=0.3; python_version < '3.14'"]
+
+[project.urls]
+Homepage = "https://github.com/sebaheg/envref"
+Repository = "https://github.com/sebaheg/envref"
+Issues = "https://github.com/sebaheg/envref/issues"
+Changelog = "https://github.com/sebaheg/envref/blob/main/CHANGELOG.md"
+
+[project.scripts]
+envref = "envref.cli:main"
+
+# Third-party resolvers register here: `name` is the URL scheme, the value a
+# `module:Class` whose instances have `.resolve(refs) -> dict[str, str]`.
+[project.entry-points."envref.resolvers"]
+env = "envref.resolvers.env:EnvResolver"
+file = "envref.resolvers.file:FileResolver"
+keychain = "envref.resolvers.keychain:KeychainResolver"
+op = "envref.resolvers.op:OnePasswordResolver"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/envref"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/envref", "tests", "README.md", "LICENSE", "CHANGELOG.md", "SECURITY.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
