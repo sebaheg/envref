@@ -86,7 +86,7 @@ def test_service_account_without_sdk_is_unavailable(monkeypatch):
 
 
 def test_template_round_trip_survives_multiline_values():
-    marker = "\x1fM\x1f"
+    marker = "@envrefM@"
     refs = ["op://a/b/c", "op://d/e/f"]
     template = op._template(refs, marker)
     output = template.replace("{{ op://a/b/c }}", "line1\nline2\n").replace("{{ op://d/e/f }}", "x")

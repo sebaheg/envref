@@ -213,7 +213,8 @@ def _parse_injected(output: str, refs: Sequence[str], marker: str) -> dict[str, 
 
 def _inject(refs: Sequence[str], env: dict[str, str]) -> tuple[dict[str, str] | None, str]:
     """Resolve via `op inject`. (values, "") on success, (None, stderr) on failure."""
-    marker = f"\x1f{secrets.token_hex(8)}\x1f"
+    # Printable on purpose: `op inject` drops control characters from its output.
+    marker = f"@envref{secrets.token_hex(8)}@"
     result = subprocess.run(
         ["op", "inject"],
         input=_template(refs, marker),
